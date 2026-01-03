@@ -26,7 +26,7 @@ Add this dependency to your `pom.xml`:
 ```xml
 
 <dependency>
-    <groupId>io.github.ashwithpoojary98io.github.ashwithpoojary98</groupId>
+    <groupId>io.github.ashwithpoojary98</groupId>
     <artifactId>nihonium</artifactId>
     <version>1.0.0</version>
 </dependency>
