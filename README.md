@@ -26,7 +26,7 @@ Add this dependency to your `pom.xml`:
 ```xml
 
 <dependency>
-    <groupId>io.github.ashwith</groupId>
+    <groupId>io.github.ashwithpoojary98io.github.ashwithpoojary98</groupId>
     <artifactId>nihonium</artifactId>
     <version>1.0.0</version>
 </dependency>
@@ -35,7 +35,7 @@ Add this dependency to your `pom.xml`:
 ### Gradle
 
 ```gradle
-implementation 'io.github.ashwith:nihonium:1.0.0'
+implementation 'io.github.ashwithpoojary98:nihonium:1.0.0'
 ```
 
 ### Requirements
@@ -95,10 +95,10 @@ Just **direct CDP + smart retries**.
 Here's a simple example to get you started:
 
 ```java
-import io.github.ashwith.WebDriver;
-import io.github.ashwith.WebElement;
-import io.github.ashwith.By;
-import io.github.ashwith.chrome.ChromeDriver;
+import io.github.ashwithpoojary98.WebDriver;
+import io.github.ashwithpoojary98.WebElement;
+import io.github.ashwithpoojary98.By;
+import io.github.ashwithpoojary98.chrome.ChromeDriver;
 
 public class Example {
     public static void main(String[] args) {
@@ -236,7 +236,7 @@ boolean isEnabled = element.isEnabled();
 ### Chrome Configuration
 
 ```java
-import io.github.ashwith.chrome.ChromeOptions;
+import io.github.ashwithpoojary98.chrome.ChromeOptions;
 
 ChromeOptions options = new ChromeOptions()
         .setHeadless(true)                        // Run in headless mode
@@ -251,7 +251,7 @@ WebDriver driver = new ChromeDriver(options);
 Customize auto-wait behavior for your specific needs:
 
 ```java
-import io.github.ashwith.wait.WaitConfig;
+import io.github.ashwithpoojary98.wait.WaitConfig;
 
 WaitConfig waitConfig = WaitConfig.builder()
         .timeout(15000)                           // 15 seconds timeout
@@ -270,11 +270,11 @@ WebDriver driver = new ChromeDriver(options, waitConfig);
 ### Complete Example: Login Flow
 
 ```java
-import io.github.ashwith.WebDriver;
-import io.github.ashwith.WebElement;
-import io.github.ashwith.By;
-import io.github.ashwith.chrome.ChromeDriver;
-import io.github.ashwith.chrome.ChromeOptions;
+import io.github.ashwithpoojary98.WebDriver;
+import io.github.ashwithpoojary98.WebElement;
+import io.github.ashwithpoojary98.By;
+import io.github.ashwithpoojary98.chrome.ChromeDriver;
+import io.github.ashwithpoojary98.chrome.ChromeOptions;
 
 public class LoginTest {
     public static void main(String[] args) {
