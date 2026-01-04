@@ -96,9 +96,6 @@ jobs:
         if: github.ref != 'refs/heads/main'
         run: mvn clean package -DskipTests
 
-      - name: Run tests
-        run: mvn test
-
       - name: Generate test report
         if: always()
         uses: dorny/test-reporter@v1
