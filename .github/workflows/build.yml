@@ -20,6 +20,29 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Configure GPG
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          gpg-connect-agent reloadagent /bye
+          export GPG_TTY=$(tty)
+
+      - name: Create Maven settings.xml
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>central</id>
+                <username>${{ secrets.MAVEN_USERNAME }}</username>
+                <password>${{ secrets.MAVEN_PASSWORD }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
       - name: Build with Maven
         run: mvn clean install -DskipTests
 
