@@ -95,11 +95,3 @@ jobs:
       - name: Build (Other Branches)
         if: github.ref != 'refs/heads/main'
         run: mvn clean package -DskipTests
-
-      - name: Generate test report
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: Maven Tests
-          path: target/surefire-reports/*.xml
-          reporter: java-junit
