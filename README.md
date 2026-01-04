@@ -15,7 +15,7 @@ control** — enabling **zero-migration adoption** for existing Selenium test su
 
 # maven-plugin
 
-[![Build Status](https://github.com/ashwithpoojary98/nihonium/actions/workflows/mavenbuild.yml/badge.svg)](https://github.com/ashwithpoojary98/nihonium/actions/workflows/mavenbuild.yml)
+[![Build Status](https://github.com/ashwithpoojary98/nihonium/actions/workflows/build.yml/badge.svg)](https://github.com/ashwithpoojary98/nihonium/actions/workflows/build.yml)
 
 ## Installation
 
