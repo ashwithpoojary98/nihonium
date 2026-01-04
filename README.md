@@ -15,7 +15,7 @@ control** — enabling **zero-migration adoption** for existing Selenium test su
 
 # maven-plugin
 
-[![Build Status](https://github.com/ashwithpoojary98/nihonium/actions/workflows/mavenbuild.yml/badge.svg)](https://github.com/ashwithpoojary98/javaflutterfinder/actions/workflows/mavenbuild.yml)
+[![Build Status](https://github.com/ashwithpoojary98/nihonium/actions/workflows/build.yml/badge.svg)](https://github.com/ashwithpoojary98/nihonium/actions/workflows/build.yml)
 
 ## Installation
 
@@ -130,26 +130,13 @@ public class Example {
 WebDriver driver = new ChromeDriver();
 
 // Navigate to URL
-driver.
-
-get("https://example.com");
+driver.get("https://example.com");
 
 // Browser controls
-driver.
+driver.navigate().back();
 
-navigate().
-
-back();
-driver.
-
-navigate().
-
-forward();
-driver.
-
-navigate().
-
-refresh();
+driver.navigate().forward();
+driver.navigate().refresh();
 
 // Get page information
 String url = driver.getCurrentUrl();
@@ -163,44 +150,28 @@ Nihonium supports all standard Selenium locator strategies:
 ```java
 // CSS Selector
 driver.findElement(By.cssSelector("#username"));
-        driver.
-
-findElement(By.cssSelector(".btn-primary"));
+driver.findElement(By.cssSelector(".btn-primary"));
 
 // XPath
-        driver.
-
-findElement(By.xpath("//button[@type='submit']"));
+driver.findElement(By.xpath("//button[@type='submit']"));
 
 // ID
-        driver.
-
-findElement(By.id("username"));
+driver.findElement(By.id("username"));
 
 // Name
-        driver.
-
-findElement(By.name("email"));
+driver.findElement(By.name("email"));
 
 // Class Name
-        driver.
-
-findElement(By.className("btn-primary"));
+driver.findElement(By.className("btn-primary"));
 
 // Tag Name
-        driver.
-
-findElement(By.tagName("h1"));
+driver.findElement(By.tagName("h1"));
 
 // Link Text
-        driver.
-
-findElement(By.linkText("Click Here"));
+driver.findElement(By.linkText("Click Here"));
 
 // Partial Link Text
-        driver.
-
-findElement(By.partialLinkText("Click"));
+driver.findElement(By.partialLinkText("Click"));
 ```
 
 ### Element Interactions
@@ -211,19 +182,13 @@ All interactions include automatic waiting:
 WebElement element = driver.findElement(By.id("username"));
 
 // Type text (waits for element to be visible and editable)
-element.
-
-sendKeys("myusername");
+element.sendKeys("myusername");
 
 // Click (waits for element to be clickable and not obscured)
-element.
-
-click();
+element.click();
 
 // Clear input field
-element.
-
-clear();
+element.clear();
 
 // Get element properties
 String text = element.getText();
@@ -309,13 +274,10 @@ public class LoginTest {
 // Find all links on the page
 List<WebElement> links = driver.findElements(By.tagName("a"));
 
-for(
-WebElement link :links){
+for(WebElement link :links){
 String href = link.getAttribute("href");
 String text = link.getText();
-    System.out.
-
-println(text +" -> "+href);
+System.out.println(text +" -> "+href);
 }
 ```
 
@@ -375,33 +337,6 @@ Nihonium retries element location automatically. If it still fails, verify:
 - The page has fully loaded
 
 ---
-
-## Why Choose Nihonium?
-
-### vs Traditional Selenium
-
-| Feature           | Traditional Selenium             | Nihonium                               |
-|-------------------|----------------------------------|----------------------------------------|
-| **Driver Setup**  | Requires ChromeDriver executable | No external drivers needed             |
-| **Communication** | HTTP protocol                    | Direct WebSocket (CDP)                 |
-| **Auto-Wait**     | Manual `WebDriverWait` needed    | Built-in Playwright-style auto-wait    |
-| **Flakiness**     | Common (stale elements, timing)  | Minimal (locator-based, smart retries) |
-| **Speed**         | Slower (HTTP overhead)           | Faster (direct CDP)                    |
-| **Dependencies**  | Large (entire Selenium stack)    | Minimal (WebSocket + Gson)             |
-| **API**           | WebDriver API                    | Same WebDriver API ✅                   |
-
-### vs Playwright Java
-
-| Feature          | Playwright Java            | Nihonium                    |
-|------------------|----------------------------|-----------------------------|
-| **Setup**        | Requires Node.js + drivers | Pure Java, no external deps |
-| **Installation** | Complex multi-step         | Single Maven dependency     |
-| **API Style**    | New API (learning curve)   | Familiar Selenium API       |
-| **Language**     | Requires Node runtime      | 100% Java                   |
-| **Auto-Wait**    | Built-in ✅                 | Built-in ✅                  |
-
----
-
 ## Supported Browsers
 
 - **Google Chrome** (fully supported)
