@@ -41,8 +41,8 @@ implementation 'io.github.ashwithpoojary98:nihonium:1.0.0'
 ### Requirements
 
 - **Java 21+**
-- **Chrome or Chromium browser** installed
-- **No ChromeDriver executable needed** - Nihonium communicates directly with Chrome via WebSocket
+- **No ChromeDriver needed** — Nihonium communicates directly with Chrome via WebSocket
+- **No pre-installed browser needed** — Nihonium auto-downloads Chrome for Testing on first run
 
 ## Why Nihonium?
 
@@ -85,8 +85,11 @@ Just **direct CDP + smart retries**.
 - **Network Idle Detection (Optional)**  
   Useful for SPA navigation and async workflows.
 
+- **Auto Browser Download**
+  Automatically downloads Chrome for Testing on first run. Cached under `~/.cache/nihonium/` — no manual setup needed.
+
 - **Chrome / Chromium Support**
-  Auto-detect browser binary or configure a custom path.
+  Auto-detect an existing installation or supply a custom binary path.
 
 ---
 
@@ -202,14 +205,22 @@ boolean isEnabled = element.isEnabled();
 
 ```java
 import io.github.ashwithpoojary98.chrome.ChromeOptions;
+import io.github.ashwithpoojary98.browser.BrowserType;
 
 ChromeOptions options = new ChromeOptions()
         .setHeadless(true)                        // Run in headless mode
         .setWindowSize(1920, 1080)                // Set window size
-        .setBinaryPath("/path/to/chrome");        // Optional: custom Chrome path
+        .setBrowserType(BrowserType.CHROMIUM)     // Optional: use Chromium instead of Chrome
+        .setBrowserVersion("131.0.6778.108")      // Optional: pin a specific version
+        .setAutoDownload(true);                   // Default: true — download if not cached
+
+// Or specify an existing local binary (skips auto-download):
+// options.setBinaryPath("/path/to/chrome");
 
 WebDriver driver = new ChromeDriver(options);
 ```
+
+The browser is cached under `~/.cache/nihonium/{browser}/{platform}/{version}/` and reused on subsequent runs.
 
 ### Advanced Auto-Wait Configuration
 
@@ -317,10 +328,12 @@ Nihonium automatically waits for:
 
 ### Chrome not found
 
-If Chrome is not in the default location, specify the path:
+By default Nihonium downloads Chrome for Testing automatically and caches it under `~/.cache/nihonium/`.
+If you want to use an existing local installation instead, specify the path:
 
 ```java
 ChromeOptions options = new ChromeOptions()
+        .setAutoDownload(false)
         .setBinaryPath("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe");
 ```
 
@@ -337,6 +350,14 @@ Nihonium retries element location automatically. If it still fails, verify:
 - The page has fully loaded
 
 ---
+## Known Limitations
+
+- **Frame switching is not yet supported.** `driver.switchTo().frame(...)` and `parentFrame()` throw `UnsupportedOperationException`. Interacting with elements inside `<iframe>` elements requires a separate CDP child session, which is planned for a future release.
+- **Named window targets** — `driver.switchTo().window("name")` requires a CDP target ID (as returned by `driver.getWindowHandles()`). Named windows opened via `window.open(..., 'name')` are not yet resolved by name.
+- **Firefox and Safari** are not supported. Nihonium is CDP-only and targets Chromium-based browsers.
+
+---
+
 ## Supported Browsers
 
 - **Google Chrome** (fully supported)
@@ -360,7 +381,7 @@ Nihonium is designed for speed and reliability:
 
 - **GitHub Repository**: https://github.com/ashwithpoojary98/nihonium
 - **Issue Tracker**: https://github.com/ashwithpoojary98/nihonium/issues
-- **Maven Central**: https://repo.maven.apache.org/maven2/io/github/ashwith/nihonium/
+- **Maven Central**: https://repo.maven.apache.org/maven2/io/github/ashwithpoojary98/nihonium/
 - **Documentation**: https://github.com/ashwithpoojary98/nihonium/wiki
 
 ---

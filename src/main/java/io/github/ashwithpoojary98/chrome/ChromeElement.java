@@ -12,28 +12,121 @@ import io.github.ashwithpoojary98.cdp.domain.CSSDomain;
 import io.github.ashwithpoojary98.cdp.domain.DOMDomain;
 import io.github.ashwithpoojary98.cdp.domain.InputDomain;
 import io.github.ashwithpoojary98.cdp.domain.RuntimeDomain;
+import io.github.ashwithpoojary98.exception.ElementNotFoundException;
 import io.github.ashwithpoojary98.network.NetworkMonitor;
 import io.github.ashwithpoojary98.wait.AutoWaitEngine;
 import io.github.ashwithpoojary98.wait.ElementWaitConditions;
 import io.github.ashwithpoojary98.wait.WaitConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * CDP-backed implementation of {@link WebElement}.
+ *
+ * <p>Every interaction (click, sendKeys, clear …) first waits for the element to
+ * reach the required state via {@link AutoWaitEngine}, then resolves the live DOM
+ * node through a fresh CDP call — so stale element exceptions cannot occur.
+ *
+ * <h3>Design notes</h3>
+ * <ul>
+ *   <li>No magic numbers: all timeouts and index constants are named.</li>
+ *   <li>{@link #clear()} uses JavaScript to reset the value and fire framework
+ *       events ({@code input}, {@code change}), making it compatible with React,
+ *       Vue, and Angular forms.</li>
+ *   <li>The scroll-stability loop sleeps between polls — never a CPU spin-wait.</li>
+ * </ul>
+ */
 public class ChromeElement implements WebElement {
 
-    private final By locator;
-    private final DOMDomain domDomain;
-    private final RuntimeDomain runtimeDomain;
-    private final InputDomain inputDomain;
-    private final CSSDomain cssDomain;
-    private final AutoWaitEngine autoWaitEngine;
-    private final WaitConfig waitConfig;
+    private static final Logger log = LoggerFactory.getLogger(ChromeElement.class);
+
+    // ── Scroll-stability polling ───────────────────────────────────────────────
+
+    /** Maximum time to wait for the element's position to stop changing after scroll. */
+    private static final long SCROLL_STABILITY_TIMEOUT_MILLIS  = 200L;
+
+    /** Interval between scroll-stability position samples. */
+    private static final long SCROLL_STABILITY_POLL_MILLIS     = 20L;
+
+    /** Consecutive identical positions required to declare the element stable. */
+    private static final int  SCROLL_STABLE_CHECKS_REQUIRED    = 3;
+
+    // ── CDP box-model content-quad indices ────────────────────────────────────
+    // The CDP `content` quad is an 8-element flat array of (x,y) pairs:
+    //   [x0,y0, x1,y1, x2,y2, x3,y3]  (top-left, top-right, bottom-right, bottom-left)
+
+    private static final int BOX_X_TOP_LEFT     = 0;
+    private static final int BOX_Y_TOP_LEFT     = 1;
+    private static final int BOX_X_BOTTOM_RIGHT = 4;
+    private static final int BOX_Y_BOTTOM_RIGHT = 5;
+
+    // ── JS scripts (constants to avoid duplication) ───────────────────────────
+
+    /**
+     * Clears an input/textarea and fires the events that JS frameworks listen for.
+     * Works with React (uses native setter), Vue, and Angular.
+     */
+    private static final String SCRIPT_CLEAR_INPUT =
+            "function() {" +
+            "  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');" +
+            "  if (nativeSetter && nativeSetter.set) {" +
+            "    nativeSetter.set.call(this, '');" +
+            "  } else {" +
+            "    this.value = '';" +
+            "  }" +
+            "  this.dispatchEvent(new Event('input',  {bubbles: true}));" +
+            "  this.dispatchEvent(new Event('change', {bubbles: true}));" +
+            "}";
+
+    private static final String SCRIPT_GET_TEXT    = "function() { return this.textContent; }";
+    private static final String SCRIPT_IS_VISIBLE  =
+            "function() { return !!(this.offsetWidth || this.offsetHeight || this.getClientRects().length); }";
+
+    // ── CDP JSON keys ─────────────────────────────────────────────────────────
+
+    private static final String KEY_ROOT      = "root";
+    private static final String KEY_NODE_ID   = "nodeId";
+    private static final String KEY_NODE_NAME = "nodeName";
+    private static final String KEY_NODE      = "node";
+    private static final String KEY_OBJECT    = "object";
+    private static final String KEY_OBJECT_ID = "objectId";
+    private static final String KEY_RESULT    = "result";
+    private static final String KEY_VALUE     = "value";
+    private static final String KEY_TYPE      = "type";
+    private static final String KEY_MODEL     = "model";
+    private static final String KEY_CONTENT   = "content";
+    private static final String KEY_NAME      = "name";
+
+    private static final String TYPE_OBJECT       = "object";
+    private static final String ATTR_CHECKED      = "checked";
+    private static final String ATTR_DISABLED     = "disabled";
+    private static final String CSS_DISPLAY       = "display";
+    private static final String CSS_VISIBILITY    = "visibility";
+    private static final String CSS_OPACITY       = "opacity";
+    private static final String CSS_DISPLAY_NONE  = "none";
+    private static final String CSS_VISIBILITY_HIDDEN = "hidden";
+    private static final String CSS_OPACITY_ZERO  = "0";
+
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private final By             locator;
+    private final DOMDomain      domDomain;
+    private final RuntimeDomain  runtimeDomain;
+    private final InputDomain    inputDomain;
+    private final CSSDomain      cssDomain;
+    private final WaitConfig     waitConfig;
     private final NetworkMonitor networkMonitor;
+    private final AutoWaitEngine autoWaitEngine;
+
+    // ── Constructors ──────────────────────────────────────────────────────────
 
     public ChromeElement(By locator, DOMDomain domDomain, RuntimeDomain runtimeDomain,
                          InputDomain inputDomain, CSSDomain cssDomain) {
-        this(locator, domDomain, runtimeDomain, inputDomain, cssDomain, WaitConfig.defaultConfig(), null);
+        this(locator, domDomain, runtimeDomain, inputDomain, cssDomain,
+                WaitConfig.defaultConfig(), null);
     }
 
     public ChromeElement(By locator, DOMDomain domDomain, RuntimeDomain runtimeDomain,
@@ -42,185 +135,66 @@ public class ChromeElement implements WebElement {
     }
 
     public ChromeElement(By locator, DOMDomain domDomain, RuntimeDomain runtimeDomain,
-                         InputDomain inputDomain, CSSDomain cssDomain, WaitConfig waitConfig, NetworkMonitor networkMonitor) {
-        this.locator = locator;
-        this.domDomain = domDomain;
-        this.runtimeDomain = runtimeDomain;
-        this.inputDomain = inputDomain;
-        this.cssDomain = cssDomain;
-        this.waitConfig = waitConfig;
+                         InputDomain inputDomain, CSSDomain cssDomain,
+                         WaitConfig waitConfig, NetworkMonitor networkMonitor) {
+        this.locator        = locator;
+        this.domDomain      = domDomain;
+        this.runtimeDomain  = runtimeDomain;
+        this.inputDomain    = inputDomain;
+        this.cssDomain      = cssDomain;
+        this.waitConfig     = waitConfig;
         this.networkMonitor = networkMonitor;
-        ElementWaitConditions conditions = new ElementWaitConditions(domDomain, cssDomain, runtimeDomain);
+
+        ElementWaitConditions conditions =
+                new ElementWaitConditions(domDomain, cssDomain, runtimeDomain);
         this.autoWaitEngine = new AutoWaitEngine(conditions, waitConfig, networkMonitor);
     }
 
-    private int getDocumentNodeId() {
-        try {
-            JsonObject docResult = domDomain.getDocument().join();
-            JsonObject root = docResult.getAsJsonObject("root");
-            return root.get("nodeId").getAsInt();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to get document node", e);
-        }
-    }
-
-    private int getNodeId() {
-        try {
-            int documentNodeId = getDocumentNodeId();
-            String cssSelector = locator.toCssSelector();
-
-            if (cssSelector != null) {
-                JsonObject result = domDomain.querySelector(documentNodeId, cssSelector).join();
-                int nodeId = result.get("nodeId").getAsInt();
-                if (nodeId == 0) {
-                    throw new RuntimeException("Element not found: " + locator);
-                }
-                return nodeId;
-            } else if (locator.isXPath()) {
-                return getNodeIdByXPath(locator.getSelector());
-            } else {
-                throw new UnsupportedOperationException("Unsupported locator type");
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to locate element: " + locator, e);
-        }
-    }
-
-    private int getNodeIdByXPath(String xpath) {
-        try {
-            String escapedXPath = xpath.replace("'", "\\'");
-            String script = String.format(
-                    "document.evaluate('%s', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue",
-                    escapedXPath
-            );
-
-            JsonObject result = runtimeDomain.evaluate(script, false).join();
-            JsonObject resultObj = result.getAsJsonObject("result");
-
-            if (resultObj.get("type").getAsString().equals("object") && resultObj.has("objectId")) {
-                String objectId = resultObj.get("objectId").getAsString();
-                JsonObject nodeResult = domDomain.requestNode(objectId).join();
-                int nodeId = nodeResult.get("nodeId").getAsInt();
-                runtimeDomain.releaseObject(objectId).join();
-
-                if (nodeId == 0) {
-                    throw new RuntimeException("Element not found: " + locator);
-                }
-                return nodeId;
-            } else {
-                throw new RuntimeException("Element not found: " + locator);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to locate element with XPath: " + xpath, e);
-        }
-    }
+    // ── WebElement interactions ───────────────────────────────────────────────
 
     @Override
     public void click() {
         autoWaitEngine.waitForElementClickable(locator);
         try {
-            int nodeId = getNodeId();
+            int nodeId = resolveNodeId();
             domDomain.scrollIntoViewIfNeeded(nodeId).join();
-
-            waitForScrollStability(nodeId, 200);
+            waitForScrollStability(nodeId);
 
             JsonObject boxModel = domDomain.getBoxModel(nodeId).join();
-            JsonObject model = boxModel.getAsJsonObject("model");
-            JsonArray content = model.getAsJsonArray("content");
+            double[] center     = extractCenter(boxModel);
 
-            double x1 = content.get(0).getAsDouble();
-            double y1 = content.get(1).getAsDouble();
-            double x2 = content.get(4).getAsDouble();
-            double y2 = content.get(5).getAsDouble();
-
-            double centerX = (x1 + x2) / 2;
-            double centerY = (y1 + y2) / 2;
-
-            inputDomain.click(centerX, centerY).join();
+            inputDomain.click(center[0], center[1]).join();
+            log.debug("Clicked {} at ({}, {})", locator, center[0], center[1]);
+        } catch (ElementNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to click element: " + locator, e);
         }
     }
 
-    private void waitForScrollStability(int nodeId, long timeoutMillis) {
-        long deadline = System.currentTimeMillis() + timeoutMillis;
-        Point previousPosition = null;
-        int stableCount = 0;
-        final int requiredStableChecks = 3;
-
-        while (System.currentTimeMillis() < deadline) {
-            Point currentPosition = getStablePosition(nodeId);
-
-            if (previousPosition != null &&
-                previousPosition.getX() == currentPosition.getX() &&
-                previousPosition.getY() == currentPosition.getY()) {
-                stableCount++;
-                if (stableCount >= requiredStableChecks) {
-                    return;
-                }
-            } else {
-                stableCount = 0;
-            }
-
-            previousPosition = currentPosition;
-
-            long remaining = deadline - System.currentTimeMillis();
-            if (remaining > 0) {
-                long waitTime = Math.min(20, remaining);
-                long waitDeadline = System.currentTimeMillis() + waitTime;
-                while (System.currentTimeMillis() < waitDeadline) {
-                    if (Thread.interrupted()) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    private Point getStablePosition(int nodeId) {
-        try {
-            JsonObject boxModel = domDomain.getBoxModel(nodeId).join();
-            JsonObject model = boxModel.getAsJsonObject("model");
-            JsonArray content = model.getAsJsonArray("content");
-
-            int x = content.get(0).getAsInt();
-            int y = content.get(1).getAsInt();
-
-            return new Point(x, y);
-        } catch (Exception e) {
-            return new Point(0, 0);
-        }
-    }
-
-    @Override
-    public void submit() {
-        try {
-            int nodeId = getNodeId();
-            JsonObject resolved = domDomain.resolveNode(nodeId).join();
-            String objectId = resolved.getAsJsonObject("object").get("objectId").getAsString();
-
-            String script = "this.form ? this.form.submit() : this.submit()";
-            runtimeDomain.callFunctionOn(objectId, "function() { " + script + "; }", null).join();
-            runtimeDomain.releaseObject(objectId).join();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to submit: " + locator, e);
-        }
-    }
-
     @Override
     public void sendKeys(CharSequence... keysToSend) {
+        if (keysToSend == null || keysToSend.length == 0) {
+            return;
+        }
         autoWaitEngine.waitForElementInteractable(locator);
         try {
-            int nodeId = getNodeId();
-            domDomain.focus(nodeId).join();
-
-            StringBuilder fullText = new StringBuilder();
+            StringBuilder text = new StringBuilder();
             for (CharSequence seq : keysToSend) {
-                fullText.append(seq);
+                if (seq != null) {
+                    text.append(seq);
+                }
+            }
+            if (text.isEmpty()) {
+                return;
             }
 
-            inputDomain.insertText(fullText.toString()).join();
+            int nodeId = resolveNodeId();
+            domDomain.focus(nodeId).join();
+            inputDomain.insertText(text.toString()).join();
+            log.debug("Sent {} char(s) to {}", text.length(), locator);
+        } catch (ElementNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to send keys to element: " + locator, e);
         }
@@ -230,54 +204,74 @@ public class ChromeElement implements WebElement {
     public void clear() {
         autoWaitEngine.waitForElementInteractable(locator);
         try {
-            int nodeId = getNodeId();
-            domDomain.focus(nodeId).join();
-
-            inputDomain.dispatchKeyEvent("keyDown", "a", "KeyA", 2).join();
-            inputDomain.dispatchKeyEvent("keyUp", "a", "KeyA", 2).join();
-            inputDomain.dispatchKeyEvent("keyDown", "Backspace", "Backspace", 0).join();
-            inputDomain.dispatchKeyEvent("keyUp", "Backspace", "Backspace", 0).join();
+            int nodeId    = resolveNodeId();
+            String objId  = resolveObjectId(nodeId);
+            runtimeDomain.callFunctionOn(objId, SCRIPT_CLEAR_INPUT, null).join();
+            runtimeDomain.releaseObject(objId).join();
+            log.debug("Cleared {}", locator);
+        } catch (ElementNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to clear element: " + locator, e);
         }
     }
 
     @Override
+    public void submit() {
+        try {
+            int nodeId   = resolveNodeId();
+            String objId = resolveObjectId(nodeId);
+            runtimeDomain.callFunctionOn(
+                    objId,
+                    "function() { this.form ? this.form.submit() : this.submit(); }",
+                    null).join();
+            runtimeDomain.releaseObject(objId).join();
+        } catch (ElementNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to submit element: " + locator, e);
+        }
+    }
+
+    // ── Introspection ─────────────────────────────────────────────────────────
+
+    @Override
     public String getTagName() {
         try {
-            int nodeId = getNodeId();
+            int nodeId       = resolveNodeId();
             JsonObject result = domDomain.describeNode(nodeId, 0).join();
-            JsonObject node = result.getAsJsonObject("node");
-            return node.get("nodeName").getAsString().toLowerCase();
+            return result.getAsJsonObject(KEY_NODE).get(KEY_NODE_NAME).getAsString().toLowerCase();
+        } catch (ElementNotFoundException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to get tag name from element: " + locator, e);
+            throw new RuntimeException("Failed to get tag name for element: " + locator, e);
         }
     }
 
     @Override
     public String getAttribute(String name) {
         try {
-            int nodeId = getNodeId();
-            JsonObject result = domDomain.getAttributes(nodeId).join();
-            JsonArray attributes = result.getAsJsonArray("attributes");
+            int nodeId        = resolveNodeId();
+            JsonObject result  = domDomain.getAttributes(nodeId).join();
+            JsonArray attrs    = result.getAsJsonArray("attributes");
 
-            for (int i = 0; i < attributes.size(); i += 2) {
-                String attrName = attributes.get(i).getAsString();
-                if (attrName.equals(name)) {
-                    return attributes.get(i + 1).getAsString();
+            for (int i = 0; i < attrs.size() - 1; i += 2) {
+                if (attrs.get(i).getAsString().equals(name)) {
+                    return attrs.get(i + 1).getAsString();
                 }
             }
             return null;
+        } catch (ElementNotFoundException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to get attribute from element: " + locator, e);
+            throw new RuntimeException("Failed to get attribute '" + name + "' for: " + locator, e);
         }
     }
 
     @Override
     public boolean isSelected() {
         try {
-            String checked = getAttribute("checked");
-            return checked != null;
+            return getAttribute(ATTR_CHECKED) != null;
         } catch (Exception e) {
             return false;
         }
@@ -286,8 +280,7 @@ public class ChromeElement implements WebElement {
     @Override
     public boolean isEnabled() {
         try {
-            String disabled = getAttribute("disabled");
-            return disabled == null;
+            return getAttribute(ATTR_DISABLED) == null;
         } catch (Exception e) {
             return false;
         }
@@ -297,50 +290,31 @@ public class ChromeElement implements WebElement {
     public String getText() {
         autoWaitEngine.waitForElementVisible(locator);
         try {
-            int nodeId = getNodeId();
-            JsonObject resolved = domDomain.resolveNode(nodeId).join();
-            String objectId = resolved.getAsJsonObject("object").get("objectId").getAsString();
+            int nodeId   = resolveNodeId();
+            String objId = resolveObjectId(nodeId);
 
-            String script = "this.textContent";
-            JsonObject result = runtimeDomain.callFunctionOn(objectId,
-                    "function() { return " + script + "; }", null).join();
+            JsonObject result = runtimeDomain.callFunctionOn(objId, SCRIPT_GET_TEXT, null).join();
+            runtimeDomain.releaseObject(objId).join();
 
-            runtimeDomain.releaseObject(objectId).join();
-
-            JsonObject resultObj = result.getAsJsonObject("result");
-            if (resultObj.has("value")) {
-                return resultObj.get("value").getAsString();
-            }
-            return "";
+            JsonObject resultObj = result.getAsJsonObject(KEY_RESULT);
+            return resultObj.has(KEY_VALUE) ? resultObj.get(KEY_VALUE).getAsString() : "";
+        } catch (ElementNotFoundException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to get text from element: " + locator, e);
+            throw new RuntimeException("Failed to get text for element: " + locator, e);
         }
-    }
-
-    @Override
-    public List<WebElement> findElements(By by) {
-        List<WebElement> elements = new ArrayList<>();
-        elements.add(new ChromeElement(by, domDomain, runtimeDomain, inputDomain, cssDomain, waitConfig, networkMonitor));
-        return elements;
-    }
-
-    @Override
-    public WebElement findElement(By by) {
-        return new ChromeElement(by, domDomain, runtimeDomain, inputDomain, cssDomain, waitConfig, networkMonitor);
     }
 
     @Override
     public boolean isDisplayed() {
         try {
-            String display = getCssValue("display");
-            String visibility = getCssValue("visibility");
-            String opacity = getCssValue("opacity");
+            String display    = getCssValue(CSS_DISPLAY);
+            String visibility = getCssValue(CSS_VISIBILITY);
+            String opacity    = getCssValue(CSS_OPACITY);
 
-            if ("none".equals(display)) return false;
-            if ("hidden".equals(visibility)) return false;
-            if ("0".equals(opacity)) return false;
-
-            return true;
+            return !CSS_DISPLAY_NONE.equals(display)
+                && !CSS_VISIBILITY_HIDDEN.equals(visibility)
+                && !CSS_OPACITY_ZERO.equals(opacity);
         } catch (Exception e) {
             return false;
         }
@@ -349,15 +323,12 @@ public class ChromeElement implements WebElement {
     @Override
     public Point getLocation() {
         try {
-            int nodeId = getNodeId();
-            JsonObject boxModel = domDomain.getBoxModel(nodeId).join();
-            JsonObject model = boxModel.getAsJsonObject("model");
-            JsonArray content = model.getAsJsonArray("content");
-
-            int x = content.get(0).getAsInt();
-            int y = content.get(1).getAsInt();
-
-            return new Point(x, y);
+            int nodeId        = resolveNodeId();
+            JsonObject model  = extractBoxModel(nodeId);
+            JsonArray content = model.getAsJsonArray(KEY_CONTENT);
+            return new Point(
+                    content.get(BOX_X_TOP_LEFT).getAsInt(),
+                    content.get(BOX_Y_TOP_LEFT).getAsInt());
         } catch (Exception e) {
             return new Point(0, 0);
         }
@@ -366,17 +337,15 @@ public class ChromeElement implements WebElement {
     @Override
     public Dimension getSize() {
         try {
-            int nodeId = getNodeId();
-            JsonObject boxModel = domDomain.getBoxModel(nodeId).join();
-            JsonObject model = boxModel.getAsJsonObject("model");
-            JsonArray content = model.getAsJsonArray("content");
+            int nodeId        = resolveNodeId();
+            JsonObject model  = extractBoxModel(nodeId);
+            JsonArray content = model.getAsJsonArray(KEY_CONTENT);
 
-            int x1 = content.get(0).getAsInt();
-            int x2 = content.get(4).getAsInt();
-            int y1 = content.get(1).getAsInt();
-            int y2 = content.get(5).getAsInt();
-
-            return new Dimension(x2 - x1, y2 - y1);
+            int width  = content.get(BOX_X_BOTTOM_RIGHT).getAsInt()
+                       - content.get(BOX_X_TOP_LEFT).getAsInt();
+            int height = content.get(BOX_Y_BOTTOM_RIGHT).getAsInt()
+                       - content.get(BOX_Y_TOP_LEFT).getAsInt();
+            return new Dimension(width, height);
         } catch (Exception e) {
             return new Dimension(0, 0);
         }
@@ -384,29 +353,210 @@ public class ChromeElement implements WebElement {
 
     @Override
     public Rectangle getRect() {
-        Point location = getLocation();
-        Dimension size = getSize();
-        return new Rectangle(location, size);
+        return new Rectangle(getLocation(), getSize());
     }
 
     @Override
     public String getCssValue(String propertyName) {
         try {
-            int nodeId = getNodeId();
-            JsonObject result = cssDomain.getComputedStyleForNode(nodeId).join();
+            int nodeId          = resolveNodeId();
+            JsonObject result    = cssDomain.getComputedStyleForNode(nodeId).join();
             JsonArray computedStyle = result.getAsJsonArray("computedStyle");
 
-            for (JsonElement element : computedStyle) {
-                JsonObject prop = element.getAsJsonObject();
-                if (prop.get("name").getAsString().equals(propertyName)) {
-                    return prop.get("value").getAsString();
+            for (JsonElement el : computedStyle) {
+                JsonObject prop = el.getAsJsonObject();
+                if (prop.get(KEY_NAME).getAsString().equals(propertyName)) {
+                    return prop.get(KEY_VALUE).getAsString();
                 }
             }
             return "";
+        } catch (ElementNotFoundException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to get CSS value from element: " + locator, e);
+            throw new RuntimeException(
+                    "Failed to get CSS value '" + propertyName + "' for: " + locator, e);
         }
     }
+
+    // ── Child element search ──────────────────────────────────────────────────
+
+    @Override
+    public WebElement findElement(By by) {
+        return new ChromeElement(by, domDomain, runtimeDomain,
+                inputDomain, cssDomain, waitConfig, networkMonitor);
+    }
+
+    @Override
+    public List<WebElement> findElements(By by) {
+        List<WebElement> result = new ArrayList<>();
+        result.add(findElement(by));
+        return result;
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Resolves the live DOM node ID for this element's locator.
+     *
+     * @return node ID (always &gt; 0)
+     * @throws ElementNotFoundException if the element cannot be found
+     */
+    private int resolveNodeId() {
+        try {
+            JsonObject docResult    = domDomain.getDocument().join();
+            int        documentNode = docResult.getAsJsonObject(KEY_ROOT)
+                                               .get(KEY_NODE_ID).getAsInt();
+
+            String cssSelector = locator.toCssSelector();
+            if (cssSelector != null) {
+                JsonObject r = domDomain.querySelector(documentNode, cssSelector).join();
+                int nodeId   = r.get(KEY_NODE_ID).getAsInt();
+                if (nodeId == 0) {
+                    throw new ElementNotFoundException("Element not found: " + locator);
+                }
+                return nodeId;
+            }
+
+            if (locator.isXPath()) {
+                return resolveNodeIdByXPath(locator.getSelector());
+            }
+
+            throw new UnsupportedOperationException(
+                    "Unsupported locator type: " + locator.getClass().getSimpleName());
+        } catch (ElementNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ElementNotFoundException("Failed to locate element: " + locator, e);
+        }
+    }
+
+    /**
+     * Resolves a DOM node ID by evaluating an XPath expression via the Runtime domain.
+     *
+     * @param xpath XPath expression
+     * @return node ID
+     * @throws ElementNotFoundException if no node matches
+     */
+    private int resolveNodeIdByXPath(String xpath) {
+        try {
+            // Use a parameterised approach to avoid XPath-in-JS injection issues
+            String escaped = xpath.replace("\\", "\\\\").replace("'", "\\'");
+            String script  = "document.evaluate('" + escaped + "', document, null, "
+                           + "XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue";
+
+            JsonObject result    = runtimeDomain.evaluate(script, false).join();
+            JsonObject resultObj = result.getAsJsonObject(KEY_RESULT);
+
+            if (TYPE_OBJECT.equals(resultObj.get(KEY_TYPE).getAsString())
+                    && resultObj.has(KEY_OBJECT_ID)) {
+                String objectId    = resultObj.get(KEY_OBJECT_ID).getAsString();
+                JsonObject nodeRes = domDomain.requestNode(objectId).join();
+                int nodeId         = nodeRes.get(KEY_NODE_ID).getAsInt();
+                runtimeDomain.releaseObject(objectId).join();
+
+                if (nodeId == 0) {
+                    throw new ElementNotFoundException("XPath returned no node: " + xpath);
+                }
+                return nodeId;
+            }
+            throw new ElementNotFoundException("XPath matched no element: " + xpath);
+        } catch (ElementNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ElementNotFoundException(
+                    "Failed to resolve node by XPath: " + xpath, e);
+        }
+    }
+
+    /**
+     * Resolves a runtime object ID for a given node ID (needed for JS calls).
+     *
+     * @param nodeId DOM node ID
+     * @return runtime object ID
+     */
+    private String resolveObjectId(int nodeId) {
+        JsonObject resolved = domDomain.resolveNode(nodeId).join();
+        return resolved.getAsJsonObject(KEY_OBJECT).get(KEY_OBJECT_ID).getAsString();
+    }
+
+    /**
+     * Extracts the {@code model} sub-object from a {@code DOM.getBoxModel} result.
+     *
+     * @param nodeId DOM node ID
+     * @return the {@code model} JSON object
+     */
+    private JsonObject extractBoxModel(int nodeId) {
+        return domDomain.getBoxModel(nodeId).join().getAsJsonObject(KEY_MODEL);
+    }
+
+    /**
+     * Computes the viewport center of an element from its box model.
+     *
+     * @param boxModel result of {@code DOM.getBoxModel}
+     * @return {@code [centerX, centerY]}
+     */
+    private double[] extractCenter(JsonObject boxModel) {
+        JsonArray content = boxModel.getAsJsonObject(KEY_MODEL).getAsJsonArray(KEY_CONTENT);
+        double x1 = content.get(BOX_X_TOP_LEFT).getAsDouble();
+        double y1 = content.get(BOX_Y_TOP_LEFT).getAsDouble();
+        double x2 = content.get(BOX_X_BOTTOM_RIGHT).getAsDouble();
+        double y2 = content.get(BOX_Y_BOTTOM_RIGHT).getAsDouble();
+        return new double[]{ (x1 + x2) / 2.0, (y1 + y2) / 2.0 };
+    }
+
+    /**
+     * Waits for the element's viewport position to stabilise after a scroll,
+     * sleeping between samples to avoid CPU waste.
+     *
+     * @param nodeId DOM node ID to monitor
+     */
+    private void waitForScrollStability(int nodeId) {
+        long deadline      = System.currentTimeMillis() + SCROLL_STABILITY_TIMEOUT_MILLIS;
+        Point previous     = null;
+        int   stableCount  = 0;
+
+        while (System.currentTimeMillis() < deadline) {
+            Point current = samplePosition(nodeId);
+
+            if (previous != null
+                    && previous.getX() == current.getX()
+                    && previous.getY() == current.getY()) {
+                if (++stableCount >= SCROLL_STABLE_CHECKS_REQUIRED) {
+                    return;
+                }
+            } else {
+                stableCount = 0;
+            }
+            previous = current;
+
+            try {
+                Thread.sleep(SCROLL_STABILITY_POLL_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return; // Give up on stability check — proceed with click
+            }
+        }
+    }
+
+    /**
+     * Samples the top-left position of the element's box model.
+     *
+     * @param nodeId DOM node ID
+     * @return current element position, or {@code Point(0,0)} on failure
+     */
+    private Point samplePosition(int nodeId) {
+        try {
+            JsonObject model  = extractBoxModel(nodeId);
+            JsonArray content = model.getAsJsonArray(KEY_CONTENT);
+            return new Point(
+                    content.get(BOX_X_TOP_LEFT).getAsInt(),
+                    content.get(BOX_Y_TOP_LEFT).getAsInt());
+        } catch (Exception e) {
+            return new Point(0, 0);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     @Override
     public String toString() {

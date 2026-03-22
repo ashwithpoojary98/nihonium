@@ -10,18 +10,27 @@ import java.util.Map;
 /**
  * Configuration options for launching Chrome/Chromium browser.
  *
- * Use the Builder pattern to construct instances:
- * <pre>
+ * <p>Use the builder to construct instances:
+ * <pre>{@code
  * BrowserOptions options = BrowserOptions.builder()
+ *     .browserType(BrowserType.CHROME)   // which browser to use
+ *     .autoDownload(true)                 // download if not installed
  *     .headless(true)
  *     .windowSize(1920, 1080)
  *     .build();
- * </pre>
+ * }</pre>
+ *
+ * <p>When {@code autoDownload} is {@code true} and no local installation is found,
+ * {@link BrowserManager} downloads the binary from the Chrome for Testing API and
+ * caches it under {@code ~/.cache/nihonium/} (Selenium Manager cache convention).
  */
 @Data
 public class BrowserOptions {
 
     private final String binaryPath;
+    private final BrowserType browserType;
+    private final String browserVersion;
+    private final boolean autoDownload;
     private final boolean headless;
     private final List<String> arguments;
     private final Map<String, String> preferences;
@@ -31,18 +40,33 @@ public class BrowserOptions {
     private final int windowHeight;
 
     private BrowserOptions(Builder builder) {
-        this.binaryPath = builder.binaryPath;
-        this.headless = builder.headless;
-        this.arguments = new ArrayList<>(builder.arguments);
-        this.preferences = new HashMap<>(builder.preferences);
-        this.debuggingPort = builder.debuggingPort;
-        this.userDataDir = builder.userDataDir;
-        this.windowWidth = builder.windowWidth;
-        this.windowHeight = builder.windowHeight;
+        this.binaryPath     = builder.binaryPath;
+        this.browserType    = builder.browserType;
+        this.browserVersion = builder.browserVersion;
+        this.autoDownload   = builder.autoDownload;
+        this.headless       = builder.headless;
+        this.arguments      = new ArrayList<>(builder.arguments);
+        this.preferences    = new HashMap<>(builder.preferences);
+        this.debuggingPort  = builder.debuggingPort;
+        this.userDataDir    = builder.userDataDir;
+        this.windowWidth    = builder.windowWidth;
+        this.windowHeight   = builder.windowHeight;
     }
 
     public String getBinaryPath() {
         return binaryPath;
+    }
+
+    public BrowserType getBrowserType() {
+        return browserType;
+    }
+
+    public String getBrowserVersion() {
+        return browserVersion;
+    }
+
+    public boolean isAutoDownload() {
+        return autoDownload;
     }
 
     public boolean isHeadless() {
@@ -87,17 +111,65 @@ public class BrowserOptions {
      */
     public static class Builder {
         private String binaryPath;
-        private boolean headless = false;
-        private List<String> arguments = new ArrayList<>();
+        private BrowserType browserType    = BrowserType.CHROME;
+        private String browserVersion      = null; // null = latest stable
+        private boolean autoDownload       = true;
+        private boolean headless           = false;
+        private List<String> arguments     = new ArrayList<>();
         private Map<String, String> preferences = new HashMap<>();
-        private int debuggingPort = 0; // 0 means auto-select
+        private int debuggingPort          = 0; // 0 means auto-select
         private String userDataDir;
-        private int windowWidth = 1280;
-        private int windowHeight = 720;
+        private int windowWidth            = 1280;
+        private int windowHeight           = 720;
+
+        /**
+         * Sets the browser type to launch (default: {@link BrowserType#CHROME}).
+         *
+         * <p>When {@link #autoDownload} is {@code true}, the specified browser type
+         * is downloaded via {@link BrowserManager} if not found locally.
+         *
+         * @param browserType the browser to use
+         * @return this builder
+         */
+        public Builder browserType(BrowserType browserType) {
+            this.browserType = browserType;
+            return this;
+        }
+
+        /**
+         * Pins the browser to a specific version (e.g. {@code "131.0.6778.108"}).
+         *
+         * <p>If not set, the latest stable release is used when auto-downloading.
+         * Has no effect when {@link #autoDownload} is {@code false} and a binary
+         * is already supplied via {@link #binaryPath}.
+         *
+         * @param version dotted version string
+         * @return this builder
+         */
+        public Builder browserVersion(String version) {
+            this.browserVersion = version;
+            return this;
+        }
+
+        /**
+         * Controls whether the browser is automatically downloaded when no local
+         * installation is found (default: {@code true}).
+         *
+         * <p>When {@code true}, {@link BrowserManager} is invoked as a fallback after
+         * the system-installation search fails. The binary is cached at
+         * {@code ~/.cache/nihonium/} so subsequent launches are instant.
+         *
+         * @param autoDownload {@code true} to enable auto-download
+         * @return this builder
+         */
+        public Builder autoDownload(boolean autoDownload) {
+            this.autoDownload = autoDownload;
+            return this;
+        }
 
         /**
          * Sets the path to the Chrome/Chromium binary.
-         * If not specified, the browser will be auto-detected.
+         * If not specified, the browser will be auto-detected or auto-downloaded.
          *
          * @param binaryPath Path to the browser binary
          * @return This builder

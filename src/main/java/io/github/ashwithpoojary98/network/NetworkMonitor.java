@@ -2,6 +2,7 @@ package io.github.ashwithpoojary98.network;
 
 import com.google.gson.JsonObject;
 import io.github.ashwithpoojary98.cdp.domain.NetworkDomain;
+import io.github.ashwithpoojary98.wait.WaitConfig;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -72,7 +73,9 @@ public class NetworkMonitor {
     }
 
     public boolean isNetworkIdle() {
-        return isNetworkIdle(0, 500);
+        return isNetworkIdle(
+                WaitConfig.DEFAULT_NETWORK_IDLE_MAX_CONNECTIONS,
+                WaitConfig.DEFAULT_NETWORK_IDLE_DURATION_MILLIS);
     }
 
     public int getActiveRequestCount() {

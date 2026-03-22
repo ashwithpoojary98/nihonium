@@ -11,7 +11,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write  # required for version-bump commit and tag push on main
 
     steps:
       - uses: actions/checkout@v4
