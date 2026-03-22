@@ -1,4 +1,4 @@
-package io.github.ashwithpoojary98.chrome.nehonium;
+package io.github.ashwithpoojary98.chrome.nihonium;
 
 import io.github.ashwithpoojary98.By;
 import io.github.ashwithpoojary98.Dimension;
@@ -18,17 +18,23 @@ class WebClientTest {
         webDriver = new ChromeDriver();
     }
 
+    @AfterEach
+    void tearDown() {
+        if (webDriver != null) {
+            webDriver.quit();
+        }
+    }
+
     @Test
     void testWebClientTest() {
+        webDriver.manage().window().maximize();
         webDriver.get("https://asynccodinghub.in/");
         String title = webDriver.getTitle();
         Assertions.assertTrue(title != null && !title.isEmpty(), "Title should not be null or empty");
-        webDriver.quit();
     }
 
     @Test
     void testNavigation() {
-
         webDriver.get("https://asynccodinghub.in/");
         String initialTitle = webDriver.getTitle();
 
@@ -41,8 +47,6 @@ class WebClientTest {
 
         webDriver.navigate().forward();
         Assertions.assertEquals(googleTitle, webDriver.getTitle(), "Should navigate forward to Google");
-
-        webDriver.quit();
     }
 
     @Test
@@ -55,8 +59,6 @@ class WebClientTest {
 
         Assertions.assertTrue(maximizedSize.getWidth() >= initialSize.getWidth(), "Width should be greater or equal after maximizing");
         Assertions.assertTrue(maximizedSize.getHeight() >= initialSize.getHeight(), "Height should be greater or equal after maximizing");
-
-        webDriver.quit();
     }
 
     @Test
@@ -66,8 +68,6 @@ class WebClientTest {
         WebElement heading = webDriver.findElement(By.tagName("h1"));
         Assertions.assertNotNull(heading, "Heading element should not be null");
         Assertions.assertFalse(heading.getText().isEmpty(), "Heading text should not be empty");
-
-        webDriver.quit();
     }
 
     @Test
@@ -75,31 +75,20 @@ class WebClientTest {
         webDriver.get("https://www.google.com");
 
         WebElement searchBox = webDriver.findElement(By.name("q"));
-        searchBox.sendKeys("Neutronium browser automation");
+        searchBox.sendKeys("Nihonium browser automation");
 
         String value = searchBox.getAttribute("value");
-        Assertions.assertEquals("Neutronium browser automation", value, "Search box value should match the input");
-
-        webDriver.quit();
+        Assertions.assertEquals("Nihonium browser automation", value, "Search box value should match the input");
     }
 
     @Test
     void testClickElement() {
         webDriver.get("https://asynccodinghub.in/");
 
-        WebElement aboutLink = webDriver.findElement(By.xpath("//a[text()='Roadmap']"));
+        WebElement aboutLink = webDriver.findElement(By.xpath("//a[contains(normalize-space(),'Start Learning')]"));
         aboutLink.click();
 
         String currentUrl = webDriver.getCurrentUrl();
-        Assertions.assertEquals(currentUrl, "https://asynccodinghub.in/roadmap.html", "URL should contain 'about' after clicking the About link");
-
-        webDriver.quit();
-    }
-
-    @AfterEach
-    void tearDown() {
-        if (webDriver != null) {
-            webDriver.quit();
-        }
+        Assertions.assertEquals("https://asynccodinghub.in/roadmap.html", currentUrl, "URL should match after clicking the link");
     }
 }
