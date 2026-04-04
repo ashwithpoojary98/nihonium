@@ -45,21 +45,27 @@ public class ChromeElement implements WebElement {
 
     // ── Scroll-stability polling ───────────────────────────────────────────────
 
-    /** Maximum time to wait for the element's position to stop changing after scroll. */
-    private static final long SCROLL_STABILITY_TIMEOUT_MILLIS  = 200L;
+    /**
+     * Maximum time to wait for the element's position to stop changing after scroll.
+     */
+    private static final long SCROLL_STABILITY_TIMEOUT_MILLIS = 200L;
 
-    /** Interval between scroll-stability position samples. */
-    private static final long SCROLL_STABILITY_POLL_MILLIS     = 20L;
+    /**
+     * Interval between scroll-stability position samples.
+     */
+    private static final long SCROLL_STABILITY_POLL_MILLIS = 20L;
 
-    /** Consecutive identical positions required to declare the element stable. */
-    private static final int  SCROLL_STABLE_CHECKS_REQUIRED    = 3;
+    /**
+     * Consecutive identical positions required to declare the element stable.
+     */
+    private static final int SCROLL_STABLE_CHECKS_REQUIRED = 3;
 
     // ── CDP box-model content-quad indices ────────────────────────────────────
     // The CDP `content` quad is an 8-element flat array of (x,y) pairs:
     //   [x0,y0, x1,y1, x2,y2, x3,y3]  (top-left, top-right, bottom-right, bottom-left)
 
-    private static final int BOX_X_TOP_LEFT     = 0;
-    private static final int BOX_Y_TOP_LEFT     = 1;
+    private static final int BOX_X_TOP_LEFT = 0;
+    private static final int BOX_Y_TOP_LEFT = 1;
     private static final int BOX_X_BOTTOM_RIGHT = 4;
     private static final int BOX_Y_BOTTOM_RIGHT = 5;
 
@@ -71,53 +77,54 @@ public class ChromeElement implements WebElement {
      */
     private static final String SCRIPT_CLEAR_INPUT =
             "function() {" +
-            "  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');" +
-            "  if (nativeSetter && nativeSetter.set) {" +
-            "    nativeSetter.set.call(this, '');" +
-            "  } else {" +
-            "    this.value = '';" +
-            "  }" +
-            "  this.dispatchEvent(new Event('input',  {bubbles: true}));" +
-            "  this.dispatchEvent(new Event('change', {bubbles: true}));" +
-            "}";
+                    "  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');" +
+                    "  if (nativeSetter && nativeSetter.set) {" +
+                    "    nativeSetter.set.call(this, '');" +
+                    "  } else {" +
+                    "    this.value = '';" +
+                    "  }" +
+                    "  this.dispatchEvent(new Event('input',  {bubbles: true}));" +
+                    "  this.dispatchEvent(new Event('change', {bubbles: true}));" +
+                    "}";
 
-    private static final String SCRIPT_GET_TEXT    = "function() { return this.textContent; }";
-    private static final String SCRIPT_IS_VISIBLE  =
+    private static final String SCRIPT_GET_TEXT = "function() { return this.textContent; }";
+    private static final String SCRIPT_IS_VISIBLE =
             "function() { return !!(this.offsetWidth || this.offsetHeight || this.getClientRects().length); }";
 
     // ── CDP JSON keys ─────────────────────────────────────────────────────────
 
-    private static final String KEY_ROOT      = "root";
-    private static final String KEY_NODE_ID   = "nodeId";
+    private static final String KEY_ROOT     = "root";
+    private static final String KEY_NODE_ID  = "nodeId";
+    private static final String KEY_NODE_IDS = "nodeIds";
     private static final String KEY_NODE_NAME = "nodeName";
-    private static final String KEY_NODE      = "node";
-    private static final String KEY_OBJECT    = "object";
+    private static final String KEY_NODE = "node";
+    private static final String KEY_OBJECT = "object";
     private static final String KEY_OBJECT_ID = "objectId";
-    private static final String KEY_RESULT    = "result";
-    private static final String KEY_VALUE     = "value";
-    private static final String KEY_TYPE      = "type";
-    private static final String KEY_MODEL     = "model";
-    private static final String KEY_CONTENT   = "content";
-    private static final String KEY_NAME      = "name";
+    private static final String KEY_RESULT = "result";
+    private static final String KEY_VALUE = "value";
+    private static final String KEY_TYPE = "type";
+    private static final String KEY_MODEL = "model";
+    private static final String KEY_CONTENT = "content";
+    private static final String KEY_NAME = "name";
 
-    private static final String TYPE_OBJECT       = "object";
-    private static final String ATTR_CHECKED      = "checked";
-    private static final String ATTR_DISABLED     = "disabled";
-    private static final String CSS_DISPLAY       = "display";
-    private static final String CSS_VISIBILITY    = "visibility";
-    private static final String CSS_OPACITY       = "opacity";
-    private static final String CSS_DISPLAY_NONE  = "none";
+    private static final String TYPE_OBJECT = "object";
+    private static final String ATTR_CHECKED = "checked";
+    private static final String ATTR_DISABLED = "disabled";
+    private static final String CSS_DISPLAY = "display";
+    private static final String CSS_VISIBILITY = "visibility";
+    private static final String CSS_OPACITY = "opacity";
+    private static final String CSS_DISPLAY_NONE = "none";
     private static final String CSS_VISIBILITY_HIDDEN = "hidden";
-    private static final String CSS_OPACITY_ZERO  = "0";
+    private static final String CSS_OPACITY_ZERO = "0";
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    private final By             locator;
-    private final DOMDomain      domDomain;
-    private final RuntimeDomain  runtimeDomain;
-    private final InputDomain    inputDomain;
-    private final CSSDomain      cssDomain;
-    private final WaitConfig     waitConfig;
+    private final By locator;
+    private final DOMDomain domDomain;
+    private final RuntimeDomain runtimeDomain;
+    private final InputDomain inputDomain;
+    private final CSSDomain cssDomain;
+    private final WaitConfig waitConfig;
     private final NetworkMonitor networkMonitor;
     private final AutoWaitEngine autoWaitEngine;
 
@@ -137,12 +144,12 @@ public class ChromeElement implements WebElement {
     public ChromeElement(By locator, DOMDomain domDomain, RuntimeDomain runtimeDomain,
                          InputDomain inputDomain, CSSDomain cssDomain,
                          WaitConfig waitConfig, NetworkMonitor networkMonitor) {
-        this.locator        = locator;
-        this.domDomain      = domDomain;
-        this.runtimeDomain  = runtimeDomain;
-        this.inputDomain    = inputDomain;
-        this.cssDomain      = cssDomain;
-        this.waitConfig     = waitConfig;
+        this.locator = locator;
+        this.domDomain = domDomain;
+        this.runtimeDomain = runtimeDomain;
+        this.inputDomain = inputDomain;
+        this.cssDomain = cssDomain;
+        this.waitConfig = waitConfig;
         this.networkMonitor = networkMonitor;
 
         ElementWaitConditions conditions =
@@ -161,7 +168,7 @@ public class ChromeElement implements WebElement {
             waitForScrollStability(nodeId);
 
             JsonObject boxModel = domDomain.getBoxModel(nodeId).join();
-            double[] center     = extractCenter(boxModel);
+            double[] center = extractCenter(boxModel);
 
             inputDomain.click(center[0], center[1]).join();
             log.debug("Clicked {} at ({}, {})", locator, center[0], center[1]);
@@ -204,8 +211,8 @@ public class ChromeElement implements WebElement {
     public void clear() {
         autoWaitEngine.waitForElementInteractable(locator);
         try {
-            int nodeId    = resolveNodeId();
-            String objId  = resolveObjectId(nodeId);
+            int nodeId = resolveNodeId();
+            String objId = resolveObjectId(nodeId);
             runtimeDomain.callFunctionOn(objId, SCRIPT_CLEAR_INPUT, null).join();
             runtimeDomain.releaseObject(objId).join();
             log.debug("Cleared {}", locator);
@@ -219,7 +226,7 @@ public class ChromeElement implements WebElement {
     @Override
     public void submit() {
         try {
-            int nodeId   = resolveNodeId();
+            int nodeId = resolveNodeId();
             String objId = resolveObjectId(nodeId);
             runtimeDomain.callFunctionOn(
                     objId,
@@ -238,7 +245,7 @@ public class ChromeElement implements WebElement {
     @Override
     public String getTagName() {
         try {
-            int nodeId       = resolveNodeId();
+            int nodeId = resolveNodeId();
             JsonObject result = domDomain.describeNode(nodeId, 0).join();
             return result.getAsJsonObject(KEY_NODE).get(KEY_NODE_NAME).getAsString().toLowerCase();
         } catch (ElementNotFoundException e) {
@@ -251,9 +258,9 @@ public class ChromeElement implements WebElement {
     @Override
     public String getAttribute(String name) {
         try {
-            int nodeId        = resolveNodeId();
-            JsonObject result  = domDomain.getAttributes(nodeId).join();
-            JsonArray attrs    = result.getAsJsonArray("attributes");
+            int nodeId = resolveNodeId();
+            JsonObject result = domDomain.getAttributes(nodeId).join();
+            JsonArray attrs = result.getAsJsonArray("attributes");
 
             for (int i = 0; i < attrs.size() - 1; i += 2) {
                 if (attrs.get(i).getAsString().equals(name)) {
@@ -290,7 +297,7 @@ public class ChromeElement implements WebElement {
     public String getText() {
         autoWaitEngine.waitForElementVisible(locator);
         try {
-            int nodeId   = resolveNodeId();
+            int nodeId = resolveNodeId();
             String objId = resolveObjectId(nodeId);
 
             JsonObject result = runtimeDomain.callFunctionOn(objId, SCRIPT_GET_TEXT, null).join();
@@ -308,13 +315,13 @@ public class ChromeElement implements WebElement {
     @Override
     public boolean isDisplayed() {
         try {
-            String display    = getCssValue(CSS_DISPLAY);
+            String display = getCssValue(CSS_DISPLAY);
             String visibility = getCssValue(CSS_VISIBILITY);
-            String opacity    = getCssValue(CSS_OPACITY);
+            String opacity = getCssValue(CSS_OPACITY);
 
             return !CSS_DISPLAY_NONE.equals(display)
-                && !CSS_VISIBILITY_HIDDEN.equals(visibility)
-                && !CSS_OPACITY_ZERO.equals(opacity);
+                    && !CSS_VISIBILITY_HIDDEN.equals(visibility)
+                    && !CSS_OPACITY_ZERO.equals(opacity);
         } catch (Exception e) {
             return false;
         }
@@ -323,8 +330,8 @@ public class ChromeElement implements WebElement {
     @Override
     public Point getLocation() {
         try {
-            int nodeId        = resolveNodeId();
-            JsonObject model  = extractBoxModel(nodeId);
+            int nodeId = resolveNodeId();
+            JsonObject model = extractBoxModel(nodeId);
             JsonArray content = model.getAsJsonArray(KEY_CONTENT);
             return new Point(
                     content.get(BOX_X_TOP_LEFT).getAsInt(),
@@ -337,14 +344,14 @@ public class ChromeElement implements WebElement {
     @Override
     public Dimension getSize() {
         try {
-            int nodeId        = resolveNodeId();
-            JsonObject model  = extractBoxModel(nodeId);
+            int nodeId = resolveNodeId();
+            JsonObject model = extractBoxModel(nodeId);
             JsonArray content = model.getAsJsonArray(KEY_CONTENT);
 
-            int width  = content.get(BOX_X_BOTTOM_RIGHT).getAsInt()
-                       - content.get(BOX_X_TOP_LEFT).getAsInt();
+            int width = content.get(BOX_X_BOTTOM_RIGHT).getAsInt()
+                    - content.get(BOX_X_TOP_LEFT).getAsInt();
             int height = content.get(BOX_Y_BOTTOM_RIGHT).getAsInt()
-                       - content.get(BOX_Y_TOP_LEFT).getAsInt();
+                    - content.get(BOX_Y_TOP_LEFT).getAsInt();
             return new Dimension(width, height);
         } catch (Exception e) {
             return new Dimension(0, 0);
@@ -359,8 +366,8 @@ public class ChromeElement implements WebElement {
     @Override
     public String getCssValue(String propertyName) {
         try {
-            int nodeId          = resolveNodeId();
-            JsonObject result    = cssDomain.getComputedStyleForNode(nodeId).join();
+            int nodeId = resolveNodeId();
+            JsonObject result = cssDomain.getComputedStyleForNode(nodeId).join();
             JsonArray computedStyle = result.getAsJsonArray("computedStyle");
 
             for (JsonElement el : computedStyle) {
@@ -380,17 +387,80 @@ public class ChromeElement implements WebElement {
 
     // ── Child element search ──────────────────────────────────────────────────
 
+    /**
+     * Finds a single child element scoped within this element.
+     *
+     * <p>The search is automatically scoped to descendants of this element by
+     * wrapping the locator in a {@link By#chained(By...) chained} locator.
+     * When both this element's locator and {@code by} are CSS-based the result
+     * is a single combined CSS descendant selector evaluated at query time.
+     */
     @Override
     public WebElement findElement(By by) {
-        return new ChromeElement(by, domDomain, runtimeDomain,
+        return new ChromeElement(By.chained(this.locator, by), domDomain, runtimeDomain,
                 inputDomain, cssDomain, waitConfig, networkMonitor);
     }
 
+    /**
+     * Finds all child elements matching {@code by} scoped within this element.
+     *
+     * <p>Returns an empty list (never throws) when no matches are found.
+     */
     @Override
     public List<WebElement> findElements(By by) {
-        List<WebElement> result = new ArrayList<>();
-        result.add(findElement(by));
-        return result;
+        try {
+            int parentNodeId = resolveNodeId();
+            return findAllChildElements(parentNodeId, by);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    private List<WebElement> findAllChildElements(int parentNodeId, By childBy) {
+        try {
+            String cssSelector = childBy.toCssSelector();
+            if (cssSelector != null) {
+                JsonObject r = domDomain.querySelectorAll(parentNodeId, cssSelector).join();
+                JsonArray nodeIds = r.getAsJsonArray(KEY_NODE_IDS);
+                List<WebElement> elements = new ArrayList<>();
+                if (nodeIds != null) {
+                    By scopedBy = By.chained(this.locator, childBy);
+                    for (int i = 0; i < nodeIds.size(); i++) {
+                        elements.add(new ChromeElement(By.index(scopedBy, i), domDomain,
+                                runtimeDomain, inputDomain, cssDomain, waitConfig, networkMonitor));
+                    }
+                }
+                return elements;
+            }
+
+            if (childBy.isXPath()) {
+                String objId = resolveObjectId(parentNodeId);
+                try {
+                    String escaped = childBy.getSelector()
+                            .replace("\\", "\\\\").replace("'", "\\'");
+                    String countScript = "function() { return document.evaluate('"
+                            + escaped + "', this, null, "
+                            + "XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).snapshotLength; }";
+                    JsonObject countResult = runtimeDomain
+                            .callFunctionOn(objId, countScript, null).join();
+                    int count = countResult.getAsJsonObject(KEY_RESULT)
+                            .get(KEY_VALUE).getAsInt();
+                    By scopedBy = By.chained(this.locator, childBy);
+                    List<WebElement> elements = new ArrayList<>();
+                    for (int i = 0; i < count; i++) {
+                        elements.add(new ChromeElement(By.index(scopedBy, i), domDomain,
+                                runtimeDomain, inputDomain, cssDomain, waitConfig, networkMonitor));
+                    }
+                    return elements;
+                } finally {
+                    try { runtimeDomain.releaseObject(objId).join(); } catch (Exception ignored) {}
+                }
+            }
+
+            return new ArrayList<>();
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -398,27 +468,42 @@ public class ChromeElement implements WebElement {
     /**
      * Resolves the live DOM node ID for this element's locator.
      *
+     * <p>Dispatches to specialised helpers for {@link By.ByIndex} and
+     * non-CSS {@link By.ByChained} locators; all other locators are resolved
+     * directly via CSS ({@code DOM.querySelector}) or XPath.
+     *
      * @return node ID (always &gt; 0)
      * @throws ElementNotFoundException if the element cannot be found
      */
     private int resolveNodeId() {
-        try {
-            JsonObject docResult    = domDomain.getDocument().join();
-            int        documentNode = docResult.getAsJsonObject(KEY_ROOT)
-                                               .get(KEY_NODE_ID).getAsInt();
+        // ByIndex: find the nth element among all matches
+        if (locator instanceof By.ByIndex) {
+            return resolveIndexedNode((By.ByIndex) locator);
+        }
 
+        try {
+            // CSS path (also handles CSS-combinable ByChained transparently)
             String cssSelector = locator.toCssSelector();
             if (cssSelector != null) {
+                JsonObject docResult = domDomain.getDocument().join();
+                int documentNode = docResult.getAsJsonObject(KEY_ROOT)
+                        .get(KEY_NODE_ID).getAsInt();
                 JsonObject r = domDomain.querySelector(documentNode, cssSelector).join();
-                int nodeId   = r.get(KEY_NODE_ID).getAsInt();
+                int nodeId = r.get(KEY_NODE_ID).getAsInt();
                 if (nodeId == 0) {
                     throw new ElementNotFoundException("Element not found: " + locator);
                 }
                 return nodeId;
             }
 
+            // XPath path
             if (locator.isXPath()) {
                 return resolveNodeIdByXPath(locator.getSelector());
+            }
+
+            // Mixed ByChained (non-CSS-combinable): step-by-step resolution
+            if (locator instanceof By.ByChained) {
+                return resolveChainedNode((By.ByChained) locator);
             }
 
             throw new UnsupportedOperationException(
@@ -427,6 +512,234 @@ public class ChromeElement implements WebElement {
             throw e;
         } catch (Exception e) {
             throw new ElementNotFoundException("Failed to locate element: " + locator, e);
+        }
+    }
+
+    /**
+     * Resolves a {@link By.ByIndex} locator by querying all matches for the
+     * parent locator and returning the node ID at the requested position.
+     */
+    private int resolveIndexedNode(By.ByIndex byIndex) {
+        By parent = byIndex.getParent();
+        int index  = byIndex.getIndex();
+
+        try {
+            // CSS-based parent (including CSS-combinable ByChained)
+            String cssSelector = parent.toCssSelector();
+            if (cssSelector != null) {
+                JsonObject docResult = domDomain.getDocument().join();
+                int documentNode = docResult.getAsJsonObject(KEY_ROOT)
+                        .get(KEY_NODE_ID).getAsInt();
+                JsonObject r = domDomain.querySelectorAll(documentNode, cssSelector).join();
+                JsonArray nodeIds = r.getAsJsonArray(KEY_NODE_IDS);
+                if (nodeIds == null || index >= nodeIds.size()) {
+                    throw new ElementNotFoundException("Index " + index + " out of bounds ("
+                            + (nodeIds == null ? 0 : nodeIds.size())
+                            + " matches) for: " + parent);
+                }
+                return nodeIds.get(index).getAsInt();
+            }
+
+            // XPath-based parent: use positional predicate (XPath is 1-based)
+            if (parent.isXPath()) {
+                String xpath = "(" + parent.getSelector() + ")[" + (index + 1) + "]";
+                return resolveNodeIdByXPath(xpath);
+            }
+
+            // Mixed ByChained parent: resolve context up to penultimate By, then
+            // find the nth child using the last By within that context
+            if (parent instanceof By.ByChained) {
+                By[] bys = ((By.ByChained) parent).getBys();
+                int contextNodeId = resolveChainedToContext(bys);
+                return resolveNthInContext(contextNodeId, bys[bys.length - 1], index);
+            }
+
+            throw new UnsupportedOperationException(
+                    "Unsupported parent locator type for By.index: "
+                            + parent.getClass().getSimpleName());
+        } catch (ElementNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ElementNotFoundException(
+                    "Failed to resolve indexed element: " + byIndex, e);
+        }
+    }
+
+    /**
+     * Resolves a mixed (non-CSS-combinable) {@link By.ByChained} locator
+     * step-by-step: first By against the document, subsequent Bys scoped to
+     * the node found by the prior step.
+     */
+    private int resolveChainedNode(By.ByChained chained) {
+        By[] bys = chained.getBys();
+        int nodeId = new ChromeElement(bys[0], domDomain, runtimeDomain,
+                inputDomain, cssDomain, waitConfig, networkMonitor).resolveNodeId();
+        for (int i = 1; i < bys.length; i++) {
+            nodeId = resolveWithContext(nodeId, bys[i]);
+        }
+        return nodeId;
+    }
+
+    /**
+     * Resolves the first {@code bys.length - 1} entries of a chain and returns
+     * the resulting node ID, which serves as context for finding the last By's
+     * matches.
+     */
+    private int resolveChainedToContext(By[] bys) {
+        int nodeId = new ChromeElement(bys[0], domDomain, runtimeDomain,
+                inputDomain, cssDomain, waitConfig, networkMonitor).resolveNodeId();
+        for (int i = 1; i < bys.length - 1; i++) {
+            nodeId = resolveWithContext(nodeId, bys[i]);
+        }
+        return nodeId;
+    }
+
+    /**
+     * Resolves a single {@code By} scoped to {@code contextNodeId} (i.e. the
+     * search is limited to descendants of that node).
+     */
+    private int resolveWithContext(int contextNodeId, By by) {
+        String cssSelector = by.toCssSelector();
+        if (cssSelector != null) {
+            try {
+                JsonObject r = domDomain.querySelector(contextNodeId, cssSelector).join();
+                int nodeId = r.get(KEY_NODE_ID).getAsInt();
+                if (nodeId == 0) {
+                    throw new ElementNotFoundException(
+                            "Element not found within context: " + by);
+                }
+                return nodeId;
+            } catch (ElementNotFoundException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ElementNotFoundException(
+                        "Failed to find element in context: " + by, e);
+            }
+        }
+
+        if (by.isXPath()) {
+            String objectId = resolveObjectId(contextNodeId);
+            try {
+                return resolveNodeByXPathInContext(objectId, by.getSelector());
+            } finally {
+                try { runtimeDomain.releaseObject(objectId).join(); } catch (Exception ignored) {}
+            }
+        }
+
+        throw new UnsupportedOperationException(
+                "Unsupported locator in chained resolution: "
+                        + by.getClass().getSimpleName());
+    }
+
+    /**
+     * Evaluates an XPath expression with {@code contextObjectId} as the context
+     * node (i.e. {@code this} in the script) and returns the first matching
+     * node's ID.
+     */
+    private int resolveNodeByXPathInContext(String contextObjectId, String xpath) {
+        String escaped = xpath.replace("\\", "\\\\").replace("'", "\\'");
+        String script = "function() { "
+                + "var r = document.evaluate('" + escaped + "', this, null, "
+                + "XPathResult.FIRST_ORDERED_NODE_TYPE, null); "
+                + "return r.singleNodeValue; }";
+        try {
+            JsonObject result = runtimeDomain
+                    .callFunctionOn(contextObjectId, script, null).join();
+            JsonObject resultObj = result.getAsJsonObject(KEY_RESULT);
+            if (TYPE_OBJECT.equals(resultObj.get(KEY_TYPE).getAsString())
+                    && resultObj.has(KEY_OBJECT_ID)) {
+                String objId = resultObj.get(KEY_OBJECT_ID).getAsString();
+                JsonObject nodeRes = domDomain.requestNode(objId).join();
+                int nodeId = nodeRes.get(KEY_NODE_ID).getAsInt();
+                runtimeDomain.releaseObject(objId).join();
+                if (nodeId == 0) {
+                    throw new ElementNotFoundException(
+                            "XPath returned no node in context: " + xpath);
+                }
+                return nodeId;
+            }
+            throw new ElementNotFoundException(
+                    "XPath matched no element in context: " + xpath);
+        } catch (ElementNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ElementNotFoundException(
+                    "Failed to resolve XPath in context: " + xpath, e);
+        }
+    }
+
+    /**
+     * Returns the node ID of the {@code index}-th (0-based) element matching
+     * {@code by} within the subtree rooted at {@code contextNodeId}.
+     */
+    private int resolveNthInContext(int contextNodeId, By by, int index) {
+        String css = by.toCssSelector();
+        if (css != null) {
+            try {
+                JsonObject r = domDomain.querySelectorAll(contextNodeId, css).join();
+                JsonArray nodeIds = r.getAsJsonArray(KEY_NODE_IDS);
+                if (nodeIds == null || index >= nodeIds.size()) {
+                    throw new ElementNotFoundException("Index " + index + " out of bounds ("
+                            + (nodeIds == null ? 0 : nodeIds.size())
+                            + " matches) for: " + by);
+                }
+                return nodeIds.get(index).getAsInt();
+            } catch (ElementNotFoundException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ElementNotFoundException(
+                        "Failed to find nth element in context: " + by, e);
+            }
+        }
+
+        if (by.isXPath()) {
+            String objId = resolveObjectId(contextNodeId);
+            try {
+                return resolveNthByXPathInContext(objId, by.getSelector(), index);
+            } finally {
+                try { runtimeDomain.releaseObject(objId).join(); } catch (Exception ignored) {}
+            }
+        }
+
+        throw new UnsupportedOperationException(
+                "Unsupported locator in context resolution: "
+                        + by.getClass().getSimpleName());
+    }
+
+    /**
+     * Evaluates an XPath snapshot relative to {@code contextObjectId} and
+     * returns the node ID of the element at position {@code index} (0-based).
+     */
+    private int resolveNthByXPathInContext(String contextObjectId, String xpath, int index) {
+        String escaped = xpath.replace("\\", "\\\\").replace("'", "\\'");
+        String script = "function() { "
+                + "var snap = document.evaluate('" + escaped + "', this, null, "
+                + "XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null); "
+                + "return snap.snapshotLength > " + index
+                + " ? snap.snapshotItem(" + index + ") : null; }";
+        try {
+            JsonObject result = runtimeDomain
+                    .callFunctionOn(contextObjectId, script, null).join();
+            JsonObject resultObj = result.getAsJsonObject(KEY_RESULT);
+            if (TYPE_OBJECT.equals(resultObj.get(KEY_TYPE).getAsString())
+                    && resultObj.has(KEY_OBJECT_ID)) {
+                String objId = resultObj.get(KEY_OBJECT_ID).getAsString();
+                JsonObject nodeRes = domDomain.requestNode(objId).join();
+                int nodeId = nodeRes.get(KEY_NODE_ID).getAsInt();
+                runtimeDomain.releaseObject(objId).join();
+                if (nodeId == 0) {
+                    throw new ElementNotFoundException(
+                            "XPath snapshot item was null: " + xpath);
+                }
+                return nodeId;
+            }
+            throw new ElementNotFoundException(
+                    "XPath returned null at index " + index + ": " + xpath);
+        } catch (ElementNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ElementNotFoundException(
+                    "Failed to resolve XPath[" + index + "] in context: " + xpath, e);
         }
     }
 
@@ -441,17 +754,17 @@ public class ChromeElement implements WebElement {
         try {
             // Use a parameterised approach to avoid XPath-in-JS injection issues
             String escaped = xpath.replace("\\", "\\\\").replace("'", "\\'");
-            String script  = "document.evaluate('" + escaped + "', document, null, "
-                           + "XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue";
+            String script = "document.evaluate('" + escaped + "', document, null, "
+                    + "XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue";
 
-            JsonObject result    = runtimeDomain.evaluate(script, false).join();
+            JsonObject result = runtimeDomain.evaluate(script, false).join();
             JsonObject resultObj = result.getAsJsonObject(KEY_RESULT);
 
             if (TYPE_OBJECT.equals(resultObj.get(KEY_TYPE).getAsString())
                     && resultObj.has(KEY_OBJECT_ID)) {
-                String objectId    = resultObj.get(KEY_OBJECT_ID).getAsString();
+                String objectId = resultObj.get(KEY_OBJECT_ID).getAsString();
                 JsonObject nodeRes = domDomain.requestNode(objectId).join();
-                int nodeId         = nodeRes.get(KEY_NODE_ID).getAsInt();
+                int nodeId = nodeRes.get(KEY_NODE_ID).getAsInt();
                 runtimeDomain.releaseObject(objectId).join();
 
                 if (nodeId == 0) {
@@ -501,7 +814,7 @@ public class ChromeElement implements WebElement {
         double y1 = content.get(BOX_Y_TOP_LEFT).getAsDouble();
         double x2 = content.get(BOX_X_BOTTOM_RIGHT).getAsDouble();
         double y2 = content.get(BOX_Y_BOTTOM_RIGHT).getAsDouble();
-        return new double[]{ (x1 + x2) / 2.0, (y1 + y2) / 2.0 };
+        return new double[]{(x1 + x2) / 2.0, (y1 + y2) / 2.0};
     }
 
     /**
@@ -511,9 +824,9 @@ public class ChromeElement implements WebElement {
      * @param nodeId DOM node ID to monitor
      */
     private void waitForScrollStability(int nodeId) {
-        long deadline      = System.currentTimeMillis() + SCROLL_STABILITY_TIMEOUT_MILLIS;
-        Point previous     = null;
-        int   stableCount  = 0;
+        long deadline = System.currentTimeMillis() + SCROLL_STABILITY_TIMEOUT_MILLIS;
+        Point previous = null;
+        int stableCount = 0;
 
         while (System.currentTimeMillis() < deadline) {
             Point current = samplePosition(nodeId);
@@ -546,7 +859,7 @@ public class ChromeElement implements WebElement {
      */
     private Point samplePosition(int nodeId) {
         try {
-            JsonObject model  = extractBoxModel(nodeId);
+            JsonObject model = extractBoxModel(nodeId);
             JsonArray content = model.getAsJsonArray(KEY_CONTENT);
             return new Point(
                     content.get(BOX_X_TOP_LEFT).getAsInt(),

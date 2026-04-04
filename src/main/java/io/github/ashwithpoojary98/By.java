@@ -108,6 +108,47 @@ public abstract class By {
         return new ByPartialLinkText(linkText);
     }
 
+    // ── Chaining / indexing factory methods ──────────────────────────────────
+
+    /**
+     * Chains multiple locators so that each one is evaluated within the element
+     * matched by the previous one.
+     *
+     * <p>When all constituent locators are CSS-based the chain is collapsed to a
+     * single CSS descendant selector at construction time:
+     * <pre>{@code
+     * By.chained(By.id("form"), By.cssSelector("input[type='email']"))
+     *   // → CSS: #form input[type='email']
+     * }</pre>
+     *
+     * <p>When the chain contains XPath or other non-CSS locators resolution
+     * proceeds step-by-step via CDP at query time.
+     *
+     * @param bys one or more locators, in parent-to-child order
+     * @return a {@code By} that resolves through the chain
+     */
+    public static By chained(By... bys) {
+        if (bys == null || bys.length == 0) {
+            throw new IllegalArgumentException("chained() requires at least one locator");
+        }
+        return new ByChained(bys);
+    }
+
+    /**
+     * Returns a locator that resolves to the element at the given 0-based
+     * position among all matches produced by {@code parent}.
+     *
+     * <p>Used internally so that every element returned by {@code findElements}
+     * can be individually re-resolved without risk of stale references.
+     *
+     * @param parent source locator
+     * @param index  0-based index into the match list
+     * @return a {@code By} that resolves to the nth match
+     */
+    public static By index(By parent, int index) {
+        return new ByIndex(parent, index);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
@@ -205,6 +246,90 @@ public abstract class By {
         @Override
         public String toString() {
             return "ByPartialLinkText: " + partialText;
+        }
+    }
+
+    /**
+     * Chains multiple locators: each subsequent locator is evaluated within the
+     * element found by the previous one.
+     *
+     * <p>When all constituent locators produce a CSS selector the chain is
+     * represented as a single combined descendant CSS selector (e.g.
+     * {@code #form input[type='email']}). Otherwise {@link #toCssSelector()}
+     * returns {@code null} and {@code ChromeElement} resolves the chain
+     * step-by-step via CDP.
+     */
+    public static final class ByChained extends By {
+
+        private final By[] bys;
+        /**
+         * Combined CSS selector when every constituent locator is CSS-based;
+         * {@code null} when at least one requires XPath or step-by-step resolution.
+         */
+        private final String combinedCss;
+
+        ByChained(By... bys) {
+            super(representativeString(bys));
+            this.bys = bys.clone();
+            this.combinedCss = tryBuildCss(bys);
+        }
+
+        private static String representativeString(By[] bys) {
+            StringBuilder sb = new StringBuilder();
+            for (By by : bys) {
+                if (sb.length() > 0) sb.append(" -> ");
+                sb.append(by.toString());
+            }
+            return sb.toString();
+        }
+
+        private static String tryBuildCss(By[] bys) {
+            StringBuilder sb = new StringBuilder();
+            for (By by : bys) {
+                String css = by.toCssSelector();
+                if (css == null) return null;
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(css);
+            }
+            return sb.toString();
+        }
+
+        @Override public String  toCssSelector() { return combinedCss; }
+        @Override public boolean isXPath()        { return false; }
+
+        /** Returns the constituent locators in chain order. */
+        public By[] getBys() { return bys.clone(); }
+
+        @Override public String toString() { return "ByChained(" + selector + ")"; }
+    }
+
+    /**
+     * Locates the element at a specific 0-based position among all matches
+     * produced by a parent locator.
+     *
+     * <p>Used internally by {@code findElements} so that every returned element
+     * can be individually re-resolved (no stale-element risk) without caching
+     * a DOM node ID.
+     */
+    public static final class ByIndex extends By {
+
+        private final By  parent;
+        private final int index;
+
+        ByIndex(By parent, int index) {
+            super(parent.getSelector() + "[" + index + "]");
+            this.parent = parent;
+            this.index  = index;
+        }
+
+        @Override public String  toCssSelector() { return null; }
+        @Override public boolean isXPath()        { return false; }
+
+        public By  getParent() { return parent; }
+        public int getIndex()  { return index; }
+
+        @Override public String toString() {
+            return "ByIndex(" + parent + ", " + index + ")";
         }
     }
 

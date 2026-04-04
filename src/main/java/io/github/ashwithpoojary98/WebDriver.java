@@ -16,6 +16,22 @@ public interface WebDriver {
 
     WebElement findElement(By by);
 
+    /**
+     * Convenience overload – equivalent to {@code findElement(By.cssSelector(cssSelector))}.
+     * Allows passing a raw CSS selector string without wrapping it in {@link By}.
+     */
+    default WebElement findElement(String cssSelector) {
+        return findElement(By.cssSelector(cssSelector));
+    }
+
+    /**
+     * Convenience overload – equivalent to {@code findElements(By.cssSelector(cssSelector))}.
+     * Allows passing a raw CSS selector string without wrapping it in {@link By}.
+     */
+    default List<WebElement> findElements(String cssSelector) {
+        return findElements(By.cssSelector(cssSelector));
+    }
+
     String getPageSource();
 
     void close();
